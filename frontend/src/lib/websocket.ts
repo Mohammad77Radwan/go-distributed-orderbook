@@ -150,9 +150,16 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 		let ws: WebSocket | null = null;
 		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 		let fallbackStop: (() => void) | null = null;
-		let latest = emptySnapshot;
 		let publishedTimestamp = emptySnapshot.timestamp;
-		let rafId = 0;
+
+		const publish = (snapshot: OrderBookSnapshot) => {
+			if (snapshot.timestamp === publishedTimestamp) {
+				return;
+			}
+
+			publishedTimestamp = snapshot.timestamp;
+			set(snapshot);
+		};
 
 		const resolveWebSocketUrl = () => {
 			const params = new URLSearchParams(window.location.search);
@@ -168,14 +175,6 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 
 			const socketProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 			return `${socketProtocol}://${window.location.host}/ws`;
-		};
-
-		const publishFrame = () => {
-			if (latest.timestamp !== publishedTimestamp) {
-				publishedTimestamp = latest.timestamp;
-				set(latest);
-			}
-			rafId = requestAnimationFrame(publishFrame);
 		};
 
 		const scheduleReconnect = () => {
@@ -201,11 +200,11 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 			ws.onmessage = (event) => {
 				try {
 					const parsed = JSON.parse(event.data) as OrderBookSnapshot;
-					latest = {
+					publish({
 						bids: Array.isArray(parsed.bids) ? parsed.bids : [],
 						asks: Array.isArray(parsed.asks) ? parsed.asks : [],
 						timestamp: parsed.timestamp ?? new Date().toISOString()
-					};
+					});
 				} catch {
 					// Ignore malformed payloads while keeping the socket alive.
 				}
@@ -221,16 +220,12 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 		};
 
 		fallbackStop = createHttpFallback((snapshot) => {
-			latest = snapshot;
+			publish(snapshot);
 		});
 
 		connect();
-		rafId = requestAnimationFrame(publishFrame);
 
 		return () => {
-			if (rafId) {
-				cancelAnimationFrame(rafId);
-			}
 			if (reconnectTimer !== null) {
 				clearTimeout(reconnectTimer);
 			}
