@@ -127,6 +127,7 @@ func newFrontendHandler() http.Handler {
 			return
 		}
 
+		w.Header().Set("Cache-Control", "no-store")
 		http.ServeFile(w, r, indexPath)
 	})
 }
