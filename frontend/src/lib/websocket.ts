@@ -184,20 +184,9 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 				}
 			};
 
-			ws.onopen = () => {
-				if (fallbackStop === null) {
-					fallbackStop = createHttpFallback((snapshot) => {
-						latest = snapshot;
-					});
-				}
-			};
+			ws.onopen = () => {};
 
 			ws.onclose = () => {
-				if (fallbackStop === null) {
-					fallbackStop = createHttpFallback((snapshot) => {
-						latest = snapshot;
-					});
-				}
 				if (reconnectTimer === null) {
 					reconnectTimer = setTimeout(() => {
 						reconnectTimer = null;
@@ -210,6 +199,10 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 				ws?.close();
 			};
 		};
+
+		fallbackStop = createHttpFallback((snapshot) => {
+			latest = snapshot;
+		});
 
 		connect();
 		rafId = requestAnimationFrame(publishFrame);
