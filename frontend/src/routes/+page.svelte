@@ -1,12 +1,26 @@
 <script lang="ts">
 	import { marketStore, type Order } from '$lib/websocket';
-	import { fromStore } from 'svelte/store';
+	import { onMount } from 'svelte';
 
-	const market = fromStore(marketStore);
 	const emptyTimestamp = new Date(0).toISOString();
+	let market = $state<{ bids: Order[]; asks: Order[]; timestamp: string }>({
+		bids: [],
+		asks: [],
+		timestamp: emptyTimestamp
+	});
 	let visibleLevels = $state(8);
 	let motionPaused = $state(false);
 	let focusSide = $state<'overview' | 'bids' | 'asks'>('overview');
+
+	onMount(() => {
+		const unsubscribe = marketStore.subscribe((snapshot) => {
+			market = snapshot;
+		});
+
+		return () => {
+			unsubscribe();
+		};
+	});
 
 	const priceFormatter = new Intl.NumberFormat('en-US', {
 		minimumFractionDigits: 2,
@@ -64,8 +78,8 @@
 		imbalance: number;
 	};
 
-	const bids = $derived([...market.current.bids].sort((left, right) => right.price - left.price));
-	const asks = $derived([...market.current.asks].sort((left, right) => left.price - right.price));
+	const bids = $derived([...market.bids].sort((left, right) => right.price - left.price));
+	const asks = $derived([...market.asks].sort((left, right) => left.price - right.price));
 	const topBids = $derived(bids.slice(0, visibleLevels));
 	const topAsks = $derived(asks.slice(0, visibleLevels));
 	const bestBid = $derived(bids[0]);
@@ -90,10 +104,10 @@
 		askQuantity: totalAskQuantity,
 		imbalance
 	});
-	const isBooting = $derived(market.current.timestamp === emptyTimestamp);
+	const isBooting = $derived(market.timestamp === emptyTimestamp);
 	const feedState = $derived(isBooting ? 'BOOTING' : 'LIVE');
 	const lastUpdated = $derived(
-		isBooting ? 'Awaiting first snapshot' : `Updated ${timestampFormatter.format(new Date(market.current.timestamp))}`
+		isBooting ? 'Awaiting first snapshot' : `Updated ${timestampFormatter.format(new Date(market.timestamp))}`
 	);
 	let tape = $state<TapeEntry[]>([]);
 	let previousSummary = $state<SnapshotSummary | null>(null);
