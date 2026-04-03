@@ -21,7 +21,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	redisAddr := getenv("REDIS_ADDR", "localhost:6379")
+	redisAddr := getenv("REDIS_ADDR", "")
 	engineService := engine.NewEngine(ctx, redisAddr)
 	defer func() {
 		if err := engineService.Close(); err != nil {
@@ -29,13 +29,12 @@ func main() {
 		}
 	}()
 
-	wsServer := gateway.NewServer(ctx, redisAddr)
+	wsServer := gateway.NewServer(ctx, engineService.Snapshot)
 	defer func() {
 		if err := wsServer.Close(); err != nil {
 			log.Printf("redis subscriber close failed: %v", err)
 		}
 	}()
-	wsServer.StartRedisBridge()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", wsServer.HandleWebSocket)
@@ -51,7 +50,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	go simulateTraffic(ctx, engineService)
+	go simulateTraffic(ctx, engineService, wsServer)
 
 	go func() {
 		<-ctx.Done()
@@ -66,7 +65,7 @@ func main() {
 	}
 }
 
-func simulateTraffic(ctx context.Context, engineService *engine.Engine) {
+func simulateTraffic(ctx context.Context, engineService *engine.Engine, wsServer *gateway.Server) {
 	seeded := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ticker := time.NewTicker(10 * time.Millisecond)
 	defer ticker.Stop()
@@ -88,7 +87,8 @@ func simulateTraffic(ctx context.Context, engineService *engine.Engine) {
 				Quantity:  1 + seeded.Intn(1000),
 				CreatedAt: time.Now().UTC(),
 			}
-			engineService.AddOrder(order)
+			snapshot := engineService.AddOrder(order)
+			wsServer.BroadcastSnapshot(snapshot)
 		}
 	}
 }

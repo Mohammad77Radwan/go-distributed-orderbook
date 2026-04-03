@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"sync"
@@ -9,7 +10,6 @@ import (
 
 	"quantum-engine/engine"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 )
 
@@ -66,25 +66,25 @@ func (hub *Hub) broadcast(message []byte) {
 }
 
 type Server struct {
-	hub         *Hub
-	upgrader    websocket.Upgrader
-	redisClient *redis.Client
-	ctx         context.Context
+	hub              *Hub
+	upgrader         websocket.Upgrader
+	ctx              context.Context
+	snapshotProvider func() engine.OrderBookSnapshot
 }
 
-func NewServer(ctx context.Context, redisAddr string) *Server {
+func NewServer(ctx context.Context, snapshotProvider func() engine.OrderBookSnapshot) *Server {
 	return &Server{
 		hub: NewHub(),
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
-		redisClient: redis.NewClient(&redis.Options{Addr: redisAddr}),
-		ctx:         ctx,
+		ctx:              ctx,
+		snapshotProvider: snapshotProvider,
 	}
 }
 
 func (server *Server) Close() error {
-	return server.redisClient.Close()
+	return nil
 }
 
 func (server *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -95,27 +95,20 @@ func (server *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := server.hub.addClient(conn)
+	if server.snapshotProvider != nil {
+		server.BroadcastSnapshot(server.snapshotProvider())
+	}
 	go server.readPump(client)
 }
 
-func (server *Server) StartRedisBridge() {
-	go func() {
-		subscriber := server.redisClient.Subscribe(server.ctx, engine.MarketUpdatesChannel)
-		defer subscriber.Close()
+func (server *Server) BroadcastSnapshot(snapshot engine.OrderBookSnapshot) {
+	message, err := json.Marshal(snapshot)
+	if err != nil {
+		log.Printf("failed to encode websocket snapshot: %v", err)
+		return
+	}
 
-		channel := subscriber.Channel()
-		for {
-			select {
-			case <-server.ctx.Done():
-				return
-			case message, ok := <-channel:
-				if !ok {
-					return
-				}
-				server.hub.broadcast([]byte(message.Payload))
-			}
-		}
-	}()
+	server.hub.broadcast(message)
 }
 
 func (server *Server) readPump(target *client) {

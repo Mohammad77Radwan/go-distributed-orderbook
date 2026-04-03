@@ -87,9 +87,8 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 			return () => {};
 		}
 
-		const isGitHubPages = window.location.hostname.endsWith('github.io');
 		const forceDemo = new URLSearchParams(window.location.search).has('demo');
-		if (isGitHubPages || forceDemo) {
+		if (forceDemo) {
 			return createSyntheticStream(set);
 		}
 
