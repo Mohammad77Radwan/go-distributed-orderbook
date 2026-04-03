@@ -37,6 +37,8 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
         run: npm run build
 
       - name: Setup Pages

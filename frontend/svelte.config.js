@@ -1,6 +1,8 @@
 import adapter from '@sveltejs/adapter-static';
 import { relative, sep } from 'node:path';
 
+const basePath = process.env.BASE_PATH ?? '';
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	compilerOptions: {
@@ -14,6 +16,9 @@ const config = {
 		}
 	},
 	kit: {
+		paths: {
+			base: basePath
+		},
 		adapter: adapter({
 			fallback: 'index.html'
 		})
