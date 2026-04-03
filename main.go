@@ -45,7 +45,7 @@ func main() {
 	mux.Handle("/", newFrontendHandler())
 
 	server := &http.Server{
-		Addr:              ":8080",
+		Addr:              ":" + getenv("PORT", "8080"),
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}

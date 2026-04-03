@@ -2,4 +2,6 @@ services:
   - type: web
     name: go-distributed-orderbook
     runtime: docker
+    plan: free
     autoDeploy: true
+    healthCheckPath: /healthz

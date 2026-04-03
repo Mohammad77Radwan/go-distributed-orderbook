@@ -10,6 +10,8 @@ Note: the demo is deployed automatically by the `Deploy Demo (GitHub Pages)` wor
 
 For a single-host realtime deployment (frontend + backend websocket together), deploy this repo as a Docker web service using [Dockerfile](Dockerfile) (for Render, [render.yaml](render.yaml) is included).
 
+Render will inject `PORT`; the Go server binds to that value automatically.
+
 ## At A Glance
 
 | Capability | Implementation |
