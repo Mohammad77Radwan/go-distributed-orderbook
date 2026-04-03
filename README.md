@@ -8,6 +8,8 @@ A realtime distributed order book simulation platform built with Go, WebSocket f
 
 Note: the demo is deployed automatically by the `Deploy Demo (GitHub Pages)` workflow on every push to `main`. To get true realtime updates on Pages, set repository secret `PUBLIC_WS_URL` to your backend websocket endpoint (example: `wss://your-backend.example.com/ws`).
 
+For a single-host realtime deployment (frontend + backend websocket together), deploy this repo as a Docker web service using [Dockerfile](Dockerfile) (for Render, [render.yaml](render.yaml) is included).
+
 ## At A Glance
 
 | Capability | Implementation |
@@ -239,6 +241,7 @@ GitHub Actions workflows:
 
 - `.github/workflows/deploy-pages.yml`
 	- Deploys demo to GitHub Pages on push to `main`
+	- Supports external websocket endpoint via `PUBLIC_WS_URL` repository secret
 
 ## Validation Commands
 

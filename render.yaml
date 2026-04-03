@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: go-distributed-orderbook
+    runtime: docker
+    autoDeploy: true
