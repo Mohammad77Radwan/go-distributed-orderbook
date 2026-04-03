@@ -89,10 +89,18 @@ func simulateTraffic(ctx context.Context, engineService *engine.Engine, wsServer
 				orderType = engine.SellOrder
 			}
 
+			mid := 100.0
+			price := mid
+			if orderType == engine.BuyOrder {
+				price = mid - seeded.Float64()*1.0
+			} else {
+				price = mid + seeded.Float64()*1.0
+			}
+
 			order := engine.Order{
 				ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
 				Type:      orderType,
-				Price:     99.0 + seeded.Float64()*2.0,
+				Price:     price,
 				Quantity:  1 + seeded.Intn(1000),
 				CreatedAt: time.Now().UTC(),
 			}
