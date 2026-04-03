@@ -82,8 +82,9 @@ function createSyntheticStream(set: (snapshot: OrderBookSnapshot) => void): () =
 }
 
 function createHttpFallback(set: (snapshot: OrderBookSnapshot) => void): () => void {
-	let interval: ReturnType<typeof setInterval> | null = null;
+	let timeout: ReturnType<typeof setTimeout> | null = null;
 	let cancelled = false;
+	let inFlight = false;
 
 	const resolveSnapshotUrl = () => {
 		const params = new URLSearchParams(window.location.search);
@@ -96,6 +97,11 @@ function createHttpFallback(set: (snapshot: OrderBookSnapshot) => void): () => v
 	};
 
 	const poll = async () => {
+		if (cancelled || inFlight) {
+			return;
+		}
+
+		inFlight = true;
 		try {
 			const response = await fetch(resolveSnapshotUrl(), { cache: 'no-store' });
 			if (!response.ok) {
@@ -112,16 +118,20 @@ function createHttpFallback(set: (snapshot: OrderBookSnapshot) => void): () => v
 			}
 		} catch {
 			// Ignore transient HTTP failures; the next poll may succeed.
+		} finally {
+			inFlight = false;
+			if (!cancelled) {
+				timeout = setTimeout(poll, 750);
+			}
 		}
 	};
 
-	poll();
-	interval = setInterval(poll, 750);
+	timeout = setTimeout(poll, 0);
 
 	return () => {
 		cancelled = true;
-		if (interval !== null) {
-			clearInterval(interval);
+		if (timeout !== null) {
+			clearTimeout(timeout);
 		}
 	};
 }
@@ -141,6 +151,7 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 		let fallbackStop: (() => void) | null = null;
 		let latest = emptySnapshot;
+		let publishedTimestamp = emptySnapshot.timestamp;
 		let rafId = 0;
 
 		const resolveWebSocketUrl = () => {
@@ -160,12 +171,32 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 		};
 
 		const publishFrame = () => {
-			set(latest);
+			if (latest.timestamp !== publishedTimestamp) {
+				publishedTimestamp = latest.timestamp;
+				set(latest);
+			}
 			rafId = requestAnimationFrame(publishFrame);
 		};
 
+		const scheduleReconnect = () => {
+			if (reconnectTimer !== null) {
+				return;
+			}
+
+			reconnectTimer = setTimeout(() => {
+				reconnectTimer = null;
+				connect();
+			}, 1000);
+		};
+
 		const connect = () => {
-			ws = new WebSocket(resolveWebSocketUrl());
+			try {
+				ws = new WebSocket(resolveWebSocketUrl());
+			} catch {
+				ws = null;
+				scheduleReconnect();
+				return;
+			}
 
 			ws.onmessage = (event) => {
 				try {
@@ -175,24 +206,13 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 						asks: Array.isArray(parsed.asks) ? parsed.asks : [],
 						timestamp: parsed.timestamp ?? new Date().toISOString()
 					};
-					if (fallbackStop !== null) {
-						fallbackStop();
-						fallbackStop = null;
-					}
 				} catch {
 					// Ignore malformed payloads while keeping the socket alive.
 				}
 			};
 
-			ws.onopen = () => {};
-
 			ws.onclose = () => {
-				if (reconnectTimer === null) {
-					reconnectTimer = setTimeout(() => {
-						reconnectTimer = null;
-						connect();
-					}, 1000);
-				}
+				scheduleReconnect();
 			};
 
 			ws.onerror = () => {

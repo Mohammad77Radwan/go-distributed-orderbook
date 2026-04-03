@@ -17,7 +17,10 @@ RUN go build -o quantum-engine ./main.go
 FROM alpine:3.23
 WORKDIR /app
 RUN apk add --no-cache ca-certificates
+RUN addgroup -S app && adduser -S app -G app
 COPY --from=backend-builder /app/quantum-engine ./quantum-engine
 COPY --from=frontend-builder /app/frontend/build ./frontend/build
+RUN chown -R app:app /app
 EXPOSE 8080
+USER app
 CMD ["./quantum-engine"]

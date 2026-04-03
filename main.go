@@ -68,7 +68,7 @@ func main() {
 		_ = server.Shutdown(shutdownCtx)
 	}()
 
-	log.Println("server listening on :8080")
+	log.Printf("server listening on %s", server.Addr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
@@ -97,7 +97,7 @@ func simulateTraffic(ctx context.Context, engineService *engine.Engine, wsServer
 				CreatedAt: time.Now().UTC(),
 			}
 			snapshot := engineService.AddOrder(order)
-			wsServer.BroadcastSnapshot(snapshot)
+			wsServer.BroadcastLiveSnapshot(snapshot)
 		}
 	}
 }

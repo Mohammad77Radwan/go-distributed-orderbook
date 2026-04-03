@@ -391,8 +391,7 @@
 				</div>
 			</div>
 
-			{#key $market.timestamp}
-				<svg class="depth-chart" viewBox="0 0 1000 360" role="img" aria-label="Depth chart">
+			<svg class="depth-chart" viewBox="0 0 1000 360" role="img" aria-label="Depth chart">
 					<defs>
 						<linearGradient id="bidFill" x1="0" y1="0" x2="0" y2="1">
 							<stop offset="0%" stop-color="rgba(124, 241, 164, 0.42)" />
@@ -447,7 +446,6 @@
 						/>
 					{/if}
 				</svg>
-			{/key}
 		</div>
 	</section>
 
