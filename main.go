@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -119,7 +120,8 @@ func newFrontendHandler() http.Handler {
 			return
 		}
 
-		candidate := filepath.Join(buildDir, filepath.Clean(r.URL.Path))
+		relPath := strings.TrimPrefix(filepath.Clean(r.URL.Path), "/")
+		candidate := filepath.Join(buildDir, relPath)
 		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 			staticServer.ServeHTTP(w, r)
 			return
