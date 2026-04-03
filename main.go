@@ -25,14 +25,14 @@ func main() {
 	engineService := engine.NewEngine(ctx, redisAddr)
 	defer func() {
 		if err := engineService.Close(); err != nil {
-			log.Printf("redis publisher close failed: %v", err)
+			log.Printf("engine shutdown close failed: %v", err)
 		}
 	}()
 
 	wsServer := gateway.NewServer(ctx, engineService.Snapshot)
 	defer func() {
 		if err := wsServer.Close(); err != nil {
-			log.Printf("redis subscriber close failed: %v", err)
+			log.Printf("websocket server close failed: %v", err)
 		}
 	}()
 

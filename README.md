@@ -1,12 +1,12 @@
 # Quantum Distributed Order Book
 
-A realtime distributed order book simulation platform built with Go, Redis Pub/Sub, WebSocket fan-out, and a live trading-style dashboard.
+A realtime distributed order book simulation platform built with Go, WebSocket fan-out, and a live trading-style dashboard, with optional Redis snapshot publishing.
 
 ## Live Demo
 
 - Production demo (GitHub Pages): https://mohammad77radwan.github.io/go-distributed-orderbook/
 
-Note: the demo is deployed automatically by the `Deploy Demo (GitHub Pages)` workflow on every push to `main`.
+Note: the demo is deployed automatically by the `Deploy Demo (GitHub Pages)` workflow on every push to `main`. To get true realtime updates on Pages, set repository secret `PUBLIC_WS_URL` to your backend websocket endpoint (example: `wss://your-backend.example.com/ws`).
 
 ## At A Glance
 
@@ -14,7 +14,7 @@ Note: the demo is deployed automatically by the `Deploy Demo (GitHub Pages)` wor
 |---|---|
 | Matching + book maintenance | In-memory concurrent order book (`sync.RWMutex`) |
 | Priority model | Price-time priority for bids/asks |
-| Event transport | Redis Pub/Sub channel `market_updates` |
+| Event transport | Direct engine -> websocket broadcast (optional Redis publish) |
 | Client delivery | WebSocket hub with safe concurrent writes |
 | UI | Svelte realtime dashboard with derived market metrics |
 | Ops basics | Health endpoint, graceful shutdown, reconnect behavior |
@@ -31,9 +31,8 @@ The system continuously simulates market order flow and streams snapshots of top
 ```mermaid
 flowchart LR
 		SIM[Order Simulator\nmain.go] --> ENG[Matching Engine\nengine/matcher.go]
-		ENG --> PUB[Snapshot Publisher\nengine/pubsub.go]
-		PUB --> REDIS[(Redis Pub/Sub\nmarket_updates)]
-		REDIS --> GATE[WebSocket Gateway\ngateway/ws.go]
+		ENG --> GATE[WebSocket Gateway\ngateway/ws.go]
+		ENG -. optional publish .-> REDIS[(Redis Pub/Sub\nmarket_updates)]
 		GATE --> UI[Realtime Dashboard\nfrontend/src/routes/+page.svelte]
 ```
 

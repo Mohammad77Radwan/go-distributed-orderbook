@@ -97,14 +97,29 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 		let latest = emptySnapshot;
 		let rafId = 0;
 
+		const resolveWebSocketUrl = () => {
+			const params = new URLSearchParams(window.location.search);
+			const queryUrl = params.get('ws');
+			if (queryUrl) {
+				return queryUrl;
+			}
+
+			const configured = import.meta.env.PUBLIC_WS_URL as string | undefined;
+			if (configured) {
+				return configured;
+			}
+
+			const socketProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+			return `${socketProtocol}://${window.location.host}/ws`;
+		};
+
 		const publishFrame = () => {
 			set(latest);
 			rafId = requestAnimationFrame(publishFrame);
 		};
 
 		const connect = () => {
-			const socketProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-			ws = new WebSocket(`${socketProtocol}://${window.location.host}/ws`);
+			ws = new WebSocket(resolveWebSocketUrl());
 
 			ws.onmessage = (event) => {
 				try {

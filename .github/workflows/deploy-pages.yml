@@ -39,6 +39,7 @@ jobs:
         working-directory: frontend
         env:
           BASE_PATH: /${{ github.event.repository.name }}
+          PUBLIC_WS_URL: ${{ secrets.PUBLIC_WS_URL }}
         run: npm run build
 
       - name: Setup Pages
