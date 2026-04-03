@@ -81,6 +81,51 @@ function createSyntheticStream(set: (snapshot: OrderBookSnapshot) => void): () =
 	};
 }
 
+function createHttpFallback(set: (snapshot: OrderBookSnapshot) => void): () => void {
+	let interval: ReturnType<typeof setInterval> | null = null;
+	let cancelled = false;
+
+	const resolveSnapshotUrl = () => {
+		const params = new URLSearchParams(window.location.search);
+		const queryUrl = params.get('snapshot');
+		if (queryUrl) {
+			return queryUrl;
+		}
+
+		return `${window.location.origin}/snapshot`;
+	};
+
+	const poll = async () => {
+		try {
+			const response = await fetch(resolveSnapshotUrl(), { cache: 'no-store' });
+			if (!response.ok) {
+				return;
+			}
+
+			const parsed = (await response.json()) as OrderBookSnapshot;
+			if (!cancelled) {
+				set({
+					bids: Array.isArray(parsed.bids) ? parsed.bids : [],
+					asks: Array.isArray(parsed.asks) ? parsed.asks : [],
+					timestamp: parsed.timestamp ?? new Date().toISOString()
+				});
+			}
+		} catch {
+			// Ignore transient HTTP failures; the next poll may succeed.
+		}
+	};
+
+	poll();
+	interval = setInterval(poll, 750);
+
+	return () => {
+		cancelled = true;
+		if (interval !== null) {
+			clearInterval(interval);
+		}
+	};
+}
+
 function createMarketStore(): Readable<OrderBookSnapshot> {
 	return readable<OrderBookSnapshot>(emptySnapshot, (set) => {
 		if (!browser) {
@@ -94,6 +139,7 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 
 		let ws: WebSocket | null = null;
 		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+		let fallbackStop: (() => void) | null = null;
 		let latest = emptySnapshot;
 		let rafId = 0;
 
@@ -129,12 +175,29 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 						asks: Array.isArray(parsed.asks) ? parsed.asks : [],
 						timestamp: parsed.timestamp ?? new Date().toISOString()
 					};
+					if (fallbackStop !== null) {
+						fallbackStop();
+						fallbackStop = null;
+					}
 				} catch {
 					// Ignore malformed payloads while keeping the socket alive.
 				}
 			};
 
+			ws.onopen = () => {
+				if (fallbackStop === null) {
+					fallbackStop = createHttpFallback((snapshot) => {
+						latest = snapshot;
+					});
+				}
+			};
+
 			ws.onclose = () => {
+				if (fallbackStop === null) {
+					fallbackStop = createHttpFallback((snapshot) => {
+						latest = snapshot;
+					});
+				}
 				if (reconnectTimer === null) {
 					reconnectTimer = setTimeout(() => {
 						reconnectTimer = null;
@@ -157,6 +220,9 @@ function createMarketStore(): Readable<OrderBookSnapshot> {
 			}
 			if (reconnectTimer !== null) {
 				clearTimeout(reconnectTimer);
+			}
+			if (fallbackStop !== null) {
+				fallbackStop();
 			}
 			ws?.close();
 		};

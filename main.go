@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -38,6 +39,13 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", wsServer.HandleWebSocket)
+	mux.HandleFunc("/snapshot", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		if err := json.NewEncoder(w).Encode(engineService.Snapshot()); err != nil {
+			http.Error(w, "failed to encode snapshot", http.StatusInternalServerError)
+		}
+	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
