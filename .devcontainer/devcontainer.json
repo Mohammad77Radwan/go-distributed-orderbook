@@ -1,0 +1,21 @@
+{
+  "name": "go-distributed-orderbook",
+  "image": "mcr.microsoft.com/devcontainers/go:1.21",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/redis-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "svelte.svelte-vscode",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  },
+  "postCreateCommand": "go mod download && cd frontend && npm install",
+  "remoteUser": "vscode"
+}
