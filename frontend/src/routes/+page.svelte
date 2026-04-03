@@ -110,7 +110,7 @@
 		isBooting ? 'Awaiting first snapshot' : `Updated ${timestampFormatter.format(new Date(market.timestamp))}`
 	);
 	let tape = $state<TapeEntry[]>([]);
-	let previousSummary = $state<SnapshotSummary | null>(null);
+	let previousSummary: SnapshotSummary | null = null;
 	const tapeLoop = $derived(tape.length > 0 ? [...tape, ...tape, ...tape] : []);
 	const emphasisText = $derived(
 		focusSide === 'overview'
