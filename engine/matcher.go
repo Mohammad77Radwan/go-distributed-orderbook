@@ -1,6 +1,14 @@
 package engine
 
-import "sort"
+import (
+	"sort"
+	"time"
+)
+
+const (
+	maxOrderAge      = 4 * time.Second
+	maxOrdersPerSide = 400
+)
 
 func NewOrderBook() *OrderBook {
 	return &OrderBook{
@@ -12,18 +20,26 @@ func NewOrderBook() *OrderBook {
 func (book *OrderBook) AddOrder(order Order) OrderBookSnapshot {
 	book.Mu.Lock()
 	defer book.Mu.Unlock()
+	now := orderCreatedAtNow()
+	book.pruneStaleLocked(now)
 
 	if order.CreatedAt.IsZero() {
-		order.CreatedAt = orderCreatedAtNow()
+		order.CreatedAt = now
 	}
 
 	switch order.Type {
 	case BuyOrder:
 		book.Bids = append(book.Bids, order)
 		book.sortBidsLocked()
+		if len(book.Bids) > maxOrdersPerSide {
+			book.Bids = book.Bids[:maxOrdersPerSide]
+		}
 	case SellOrder:
 		book.Asks = append(book.Asks, order)
 		book.sortAsksLocked()
+		if len(book.Asks) > maxOrdersPerSide {
+			book.Asks = book.Asks[:maxOrdersPerSide]
+		}
 	default:
 		return book.snapshotLocked()
 	}
@@ -32,10 +48,28 @@ func (book *OrderBook) AddOrder(order Order) OrderBookSnapshot {
 }
 
 func (book *OrderBook) Snapshot() OrderBookSnapshot {
-	book.Mu.RLock()
-	defer book.Mu.RUnlock()
+	book.Mu.Lock()
+	defer book.Mu.Unlock()
+	book.pruneStaleLocked(orderCreatedAtNow())
 
 	return book.snapshotLocked()
+}
+
+func (book *OrderBook) pruneStaleLocked(now time.Time) {
+	cutoff := now.Add(-maxOrderAge)
+	book.Bids = filterRecentOrders(book.Bids, cutoff)
+	book.Asks = filterRecentOrders(book.Asks, cutoff)
+}
+
+func filterRecentOrders(orders []Order, cutoff time.Time) []Order {
+	filtered := orders[:0]
+	for _, order := range orders {
+		if order.CreatedAt.After(cutoff) {
+			filtered = append(filtered, order)
+		}
+	}
+
+	return filtered
 }
 
 func (book *OrderBook) snapshotLocked() OrderBookSnapshot {
