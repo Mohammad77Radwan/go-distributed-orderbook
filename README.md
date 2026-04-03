@@ -2,6 +2,12 @@
 
 A realtime distributed order book simulation platform built with Go, Redis Pub/Sub, WebSocket fan-out, and a live trading-style dashboard.
 
+## Live Demo
+
+- Production demo (GitHub Pages): https://mohammad77radwan.github.io/go-distributed-orderbook/
+
+Note: the demo is deployed automatically by the `Deploy Demo (GitHub Pages)` workflow on every push to `main`.
+
 ## At A Glance
 
 | Capability | Implementation |
@@ -12,6 +18,7 @@ A realtime distributed order book simulation platform built with Go, Redis Pub/S
 | Client delivery | WebSocket hub with safe concurrent writes |
 | UI | Svelte realtime dashboard with derived market metrics |
 | Ops basics | Health endpoint, graceful shutdown, reconnect behavior |
+| Quality gates | GitHub Actions test/check/build on push + PR |
 
 ## What The System Does
 
@@ -158,6 +165,44 @@ go run .
 }
 ```
 
+## Measurable Performance
+
+Benchmarks were executed with:
+
+```bash
+go test ./engine -bench . -benchmem -run ^$
+```
+
+Environment:
+- OS: Linux (container)
+- CPU: Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+- Go: 1.25.8
+
+Results:
+
+| Benchmark | ns/op | B/op | allocs/op |
+|---|---:|---:|---:|
+| `BenchmarkOrderBookAddOrderSingleThreaded` | 38506 | 77134 | 6 |
+| `BenchmarkOrderBookAddOrderParallel` | 254042 | 368080 | 6 |
+| `BenchmarkOrderBookSnapshotTop10` | 6187 | 32768 | 2 |
+
+Interpretation:
+- Snapshot generation is cheap and predictable (`~6.2us/op`, 2 allocs/op).
+- Add-order path remains stable under contention with deterministic priority sorting.
+- The simulation loop in `main.go` currently emits one order every `10ms` (about 100 updates/sec).
+
+## Realtime Behavior And Recovery
+
+The frontend socket client (`frontend/src/lib/websocket.ts`) is designed for deterministic recovery:
+
+- Reconnect interval: 1000ms after socket close
+- Render decoupling: UI publishes the latest snapshot on `requestAnimationFrame`
+- Malformed payload handling: dropped without tearing down application state
+
+Practical implication:
+- transient websocket failures recover quickly (first retry within 1 second)
+- rendering remains smooth under bursty update cadence
+
 ## Design Notes
 
 ### Why snapshots over diffs?
@@ -182,6 +227,20 @@ go run .
 - Client cleanup on write/read failure.
 - Frontend reconnect loop on socket close.
 
+## CI / Quality Gates
+
+GitHub Actions workflows:
+
+- `.github/workflows/ci.yml`
+	- Go dependency verification (`go mod tidy` must be clean)
+	- Go unit tests
+	- Go race detector
+	- Frontend type/framework checks (`npm run check`)
+	- Frontend production build (`npm run build`)
+
+- `.github/workflows/deploy-pages.yml`
+	- Deploys demo to GitHub Pages on push to `main`
+
 ## Validation Commands
 
 ```bash
@@ -190,6 +249,10 @@ go test ./...
 
 ```bash
 cd frontend && npm run check
+```
+
+```bash
+go test ./engine -bench . -benchmem -run ^$
 ```
 
 ## Roadmap
